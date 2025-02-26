@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Summary Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            .no-print, .no-print * {
+                display: none !important;
+            }
+            .card {
+                border: 1px solid #000;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid #000;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<img src="https://www.lshtm.ac.uk/sites/default/files/styles/centre_header_logo/public/mrc-gambia-logo_0.png?itok=F_usOmtU" alt="" width="300px" height="80px">
+<body>
+    <div class="container mt-4">
+        <h2 class="text-center">Summary Report</h2>
+        
+        <!-- Print Button -->
+        <div class="d-flex justify-content-start mb-3 no-print">
+            <button class="btn btn-success" onclick="window.print()">Print Report</button>
+        </div>
+        
+        <!-- Stock Summary Card -->
+        <div class="card">
+            <div class="card-header">Stock Summary</div>
+            <div class="card-body">
+                <p><strong>Total Stock:</strong> {{ total_stock }}</p>
+                <p><strong>Total Used:</strong> {{ total_used }}</p>
+                <p><strong>Total Remaining:</strong> {{ total_remaining }}</p>
+            </div>
+        </div>
+
+        <!-- Detailed Stock Report Card -->
+        <div class="card mt-4">
+            <div class="card-header">Detailed Stock Report</div>
+            <div class="card-body">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Reception Date</th>
+                            <th>Total Stock</th>
+                            <th>Used</th>
+                            <th>Remaining</th>
+                            <th>Received From</th>
+                            <th>Box Count</th>
+                            <th>Packs per Box</th>
+                            <th>Company Name</th>
+                            <th>Batch/Lot Number</th>
+                            <th>Reference Number</th>
+                            <th>Expiry Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for drug in drugs %}
+                        <tr>
+                            <td>{{ drug.name }}</td>
+                            <td>{{ drug.reception_date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ drug.total_stock }}</td>
+                            <td>{{ drug.used }}</td>
+                            <td>{{ drug.remaining }}</td>
+                            <td>{{ drug.received_from }}</td>
+                            <td>{{ drug.box_count }}</td>
+                            <td>{{ drug.pack_per_box }}</td>
+                            <td>{{ drug.company_name }}</td>
+                            <td>{{ drug.lot_batch_number }}</td>
+                            <td>{{ drug.reference_number }}</td>
+                            <td>{{ drug.expiry_date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
