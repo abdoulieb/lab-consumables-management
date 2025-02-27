@@ -26,7 +26,6 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(60), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
 
-# Drug model
 class Drug(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -41,6 +40,7 @@ class Drug(db.Model):
     lot_batch_number = db.Column(db.String(100), nullable=True)
     company_name = db.Column(db.String(100), nullable=True)
     reference_number = db.Column(db.String(100), nullable=True)
+    reorder_limit = db.Column(db.Integer, nullable=False, default=10)  # Add this line
 
 # Load user for Flask-Login
 @login_manager.user_loader
@@ -78,16 +78,15 @@ def send_email(subject, body):
 def index():
     drugs = Drug.query.filter(Drug.remaining != 0).all()
     for drug in drugs:
-        if drug.remaining <= 10:  # Alert if remaining stock is 10 or less
-            flash(f'Reorder {drug.name} - This item is about to finish in stock!', 'warning')
+        if drug.remaining <= drug.reorder_limit:  # Check against reorder_limit
+            flash(f'Reorder {drug.name} - This item is below the reorder limit! Remaining stock: {drug.remaining}', 'warning')
             
             # Send email alert
             subject = f"Low Stock Alert: {drug.name}"
-            body = f"The stock for {drug.name} is running low. Remaining stock: {drug.remaining}. Please reorder soon."
+            body = f"The stock for {drug.name} is below the reorder limit. Remaining stock: {drug.remaining}. Please reorder soon."
             send_email(subject, body)
     
     return render_template('index.html', drugs=drugs, datetime=datetime)
-
 # Login route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -212,6 +211,7 @@ def add_drug():
         company_name = request.form['company_name']
         expiry_date = request.form['expiry_date']
         reference_number = request.form['reference_number']
+        reorder_limit = int(request.form['reorder_limit'])  # Add this line
 
         new_drug = Drug(
             name=name,
@@ -223,7 +223,8 @@ def add_drug():
             reference_number=reference_number,
             expiry_date=expiry_date,
             total_stock=box_count * pack_per_box,
-            remaining=box_count  # Remaining is now based on box_count
+            remaining=box_count,  # Remaining is now based on box_count
+            reorder_limit=reorder_limit  # Add this line
         )
         db.session.add(new_drug)
         db.session.commit()

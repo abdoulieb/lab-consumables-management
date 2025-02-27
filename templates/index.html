@@ -122,11 +122,14 @@
                         <label for="pack_per_box" class="form-label">Packs per Box</label>
                         <input type="number" class="form-control" name="pack_per_box" min="1" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Add Item</button>
+                    <div class="mb-3">
+                        <label for="reorder_limit" class="form-label">Reorder Limit</label>
+                        <input type="number" class="form-control" name="reorder_limit" min="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Drug</button>
                 </form>
             </div>
         </div>
-
         <!-- Search Form -->
         <form action="{{ url_for('search_drug') }}" method="GET" class="d-flex mb-3 mt-4">
             <input type="text" name="search_query" class="form-control me-2" placeholder="Enter item name" required>
