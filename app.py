@@ -35,25 +35,14 @@ Functions:
     - load_user(user_id): Loads a user for Flask-Login session management
 Execution:
     - The application runs on host '0.0.0.0' and port 5000 with debug mode enabled
-    # Install the required modules
-    pip install flask flask_sqlalchemy flask_login flask_bcrypt apscheduler pywin32
-
-- win32com.client: win32 (for sending emails via Outlook)
-- apscheduler.schedulers.background: BackgroundScheduler (for scheduling tasks)
-- atexit: atexit (for ensuring the scheduler shuts down when the app stops)
-- DrugUpdate: Represents updates to drug quantities
-- /log_report: Route for generating a log report of drug updates (requires login)
-- send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients=None, attachment=None): Sends an email using Outlook
-- send_daily_email_reminder(): Sends a daily email reminder for low stock items
-- create_system_owner(): Creates a system owner if one does not exist
--this is abdoulie bahgit
--i wan to update this chnges 
 """
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from datetime import datetime
+
+
 import win32com.client as win32
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -71,6 +60,20 @@ bcrypt = Bcrypt(app)
 
 # Flask-Login setup
 login_manager = LoginManager(app)
+login_manager.login_view = 'login'  # Set the login view
+
+@app.context_processor
+def inject_datetime():
+    return dict(datetime=datetime)
+
+class Organization(db.Model):
+    __tablename__ = 'organization'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    users = db.relationship('User', backref='organization', lazy=True)
+    drugs = db.relationship('Drug', backref='organization', lazy=True)
+    expired_drugs = db.relationship('ExpiredDrug', backref='organization', lazy=True)
+
 login_manager.login_view = 'login'  # Set the login view
 
 # APScheduler setup
@@ -96,15 +99,19 @@ class Organization(db.Model):
 
 class User(db.Model, UserMixin):
     __tablename__ = 'user'
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(60), nullable=False)
     email = db.Column(db.String(100), nullable=False)  # Add this line for email
     is_admin = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(50), default='user')  # Add this line
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
     role = db.Column(db.String(50), default='user')
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
 
 class Drug(db.Model):
+    __tablename__ = 'drug'
     __tablename__ = 'drug'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -162,43 +169,16 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def index():
-    # Fetch drugs only for the current organization
-    drugs = Drug.query.filter_by(organization_id=current_user.organization_id).filter(Drug.remaining != 0).all()
-    today = datetime.utcnow().date()
-
-    # Fetch the admin's email from the database
-    admin = User.query.filter_by(organization_id=current_user.organization_id, is_admin=True).first()
-    if not admin:
-        flash('No admin found for this organization.', 'danger')
-        return render_template('index.html', drugs=drugs, datetime=datetime)
-
-    admin_email = admin.email  # Get the admin's email from the database
-
-    # Check if admin_email is None or empty
-    if not admin_email:
-        flash('Admin email is not set. Please update the admin profile with a valid email.', 'warning')
-        return render_template('index.html', drugs=drugs, datetime=datetime)
-
+    drugs = Drug.query.filter(Drug.remaining != 0).all()
     for drug in drugs:
         if drug.remaining <= drug.reorder_limit:
             flash(f'Reorder {drug.name} - This item is below the reorder limit! Remaining stock: {drug.remaining}', 'warning')
             
-            # Send an email to the admin
+            # Send email alert
             subject = f"Low Stock Alert: {drug.name}"
-            body = f"The current stock level for {drug.name} is below the reorder limit. Remaining stock: {drug.remaining}."
-            to_recipients = [admin_email]  # Use the admin's email from the database
-            sender_email = "lshab52@lshtm.ac.uk"  # Hardcode the sender's email or fetch it from a config file
-            cc_recipients = None  # Optional: Add CC recipients if needed
-            attachment = None  # Optional: Add attachment if needed
-
-            send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients, attachment)
-
-        if drug.expiry_date < today:
-            drug.is_maintained = False
-        else:
-            drug.is_maintained = True
-
-    db.session.commit()
+            body = f"The stock for {drug.name} is below the reorder limit. Remaining stock: {drug.remaining}. Please reorder soon."
+            send_email(subject, body)
+    
     return render_template('index.html', drugs=drugs, datetime=datetime)
 
 # Remove expired drug route
@@ -265,6 +245,31 @@ def login():
         else:
             flash('Invalid username or password.', 'danger')
     return render_template('login.html')
+def create_system_owner():
+    # Check if a system owner already exists
+    system_owner = User.query.filter_by(role='system_owner').first()
+    if not system_owner:
+        # Create the system owner
+        hashed_password = bcrypt.generate_password_hash('system_owner_password').decode('utf-8')
+        system_owner = User(
+            username='system_owner',
+            password=hashed_password,
+            role='system_owner',
+            is_admin=True,
+            organization_id=None  # System owner doesn't belong to any organization initially
+        )
+        db.session.add(system_owner)
+        db.session.commit()
+        print("System owner created successfully!")
+    else:
+        print("System owner already exists.")
+# Logout route
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('login'))  # Redirect to the login page
 def create_system_owner():
     # Check if a system owner already exists
     system_owner = User.query.filter_by(role='system_owner').first()
@@ -424,18 +429,13 @@ def manage_users():
             flash('Username already exists. Please choose a different username.', 'danger')
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-            new_user = User(
-                username=username,
-                password=hashed_password,
-                email=email,  # Save the email
-                is_admin=is_admin,
-                organization_id=current_user.organization_id
-            )
+            new_user = User(username=username, password=hashed_password, is_admin=is_admin)
             db.session.add(new_user)
             db.session.commit()
             flash('User added successfully!', 'success')
 
-    users = User.query.filter_by(organization_id=current_user.organization_id).all()
+    # Fetch all users
+    users = User.query.all()
     return render_template('manage_users.html', users=users)
 
 # Add drug route - Allow any logged-in user to add items
