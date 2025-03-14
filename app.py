@@ -47,6 +47,7 @@ Execution:
 - send_daily_email_reminder(): Sends a daily email reminder for low stock items
 - create_system_owner(): Creates a system owner if one does not exist
 -this is abdoulie bahgit
+-i wan to update this chnges 
 """
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
