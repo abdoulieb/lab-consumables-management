@@ -35,12 +35,29 @@ Functions:
     - load_user(user_id): Loads a user for Flask-Login session management
 Execution:
     - The application runs on host '0.0.0.0' and port 5000 with debug mode enabled
+    # Install the required modules
+    pip install flask flask_sqlalchemy flask_login flask_bcrypt apscheduler pywin32
+
+- win32com.client: win32 (for sending emails via Outlook)
+- apscheduler.schedulers.background: BackgroundScheduler (for scheduling tasks)
+- atexit: atexit (for ensuring the scheduler shuts down when the app stops)
+- DrugUpdate: Represents updates to drug quantities
+- /log_report: Route for generating a log report of drug updates (requires login)
+- send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients=None, attachment=None): Sends an email using Outlook
+- send_daily_email_reminder(): Sends a daily email reminder for low stock items
+- create_system_owner(): Creates a system owner if one does not exist
+-this is abdoulie bahgit
+-i wan to update this chnges 
 """
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from datetime import datetime
+import win32com.client as win32
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
+
 
 
 
@@ -55,6 +72,15 @@ bcrypt = Bcrypt(app)
 # Flask-Login setup
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'  # Set the login view
+
+# APScheduler setup
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+# Ensure the scheduler shuts down when the app stops
+atexit.register(lambda: scheduler.shutdown())
+
+
 
 @app.context_processor
 def inject_datetime():
@@ -73,8 +99,9 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(60), nullable=False)
+    email = db.Column(db.String(100), nullable=False)  # Add this line for email
     is_admin = db.Column(db.Boolean, default=False)
-    role = db.Column(db.String(50), default='user')  # Add this line
+    role = db.Column(db.String(50), default='user')
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
 
 class Drug(db.Model):
@@ -139,9 +166,32 @@ def index():
     drugs = Drug.query.filter_by(organization_id=current_user.organization_id).filter(Drug.remaining != 0).all()
     today = datetime.utcnow().date()
 
+    # Fetch the admin's email from the database
+    admin = User.query.filter_by(organization_id=current_user.organization_id, is_admin=True).first()
+    if not admin:
+        flash('No admin found for this organization.', 'danger')
+        return render_template('index.html', drugs=drugs, datetime=datetime)
+
+    admin_email = admin.email  # Get the admin's email from the database
+
+    # Check if admin_email is None or empty
+    if not admin_email:
+        flash('Admin email is not set. Please update the admin profile with a valid email.', 'warning')
+        return render_template('index.html', drugs=drugs, datetime=datetime)
+
     for drug in drugs:
         if drug.remaining <= drug.reorder_limit:
             flash(f'Reorder {drug.name} - This item is below the reorder limit! Remaining stock: {drug.remaining}', 'warning')
+            
+            # Send an email to the admin
+            subject = f"Low Stock Alert: {drug.name}"
+            body = f"The current stock level for {drug.name} is below the reorder limit. Remaining stock: {drug.remaining}."
+            to_recipients = [admin_email]  # Use the admin's email from the database
+            sender_email = "lshab52@lshtm.ac.uk"  # Hardcode the sender's email or fetch it from a config file
+            cc_recipients = None  # Optional: Add CC recipients if needed
+            attachment = None  # Optional: Add attachment if needed
+
+            send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients, attachment)
 
         if drug.expiry_date < today:
             drug.is_maintained = False
@@ -234,6 +284,92 @@ def create_system_owner():
     else:
         print("System owner already exists.")
 # Logout route
+def send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients=None, attachment=None):
+    try:
+        # Check if to_recipients contains None
+        if None in to_recipients:
+            raise ValueError("Recipient list contains None. Please provide valid email addresses.")
+
+        # Attempt to get an instance of the Outlook application
+        outlook = win32.GetActiveObject("Outlook.Application")
+    except Exception as e:
+        # If Outlook is not running, start a new instance
+        outlook = win32.Dispatch("Outlook.Application")
+
+    mail = outlook.CreateItem(0)  # 0 means the email is a new mail item
+
+    mail.Subject = subject
+    mail.Body = body
+
+    # Set the sender's email
+    mail.Sender = sender_email
+
+    # Adding recipients
+    mail.To = ";".join(to_recipients)  # ";" is used to separate multiple recipients
+
+    if cc_recipients:
+        mail.CC = ";".join(cc_recipients)
+
+    # Attach a file if specified
+    if attachment:
+        mail.Attachments.Add(attachment)
+
+    # Display the email before sending (Outlook will open if not already running)
+    mail.Display()
+
+    # Sending the email
+    mail.Send()
+    print("Email sent successfully!")
+
+# Function to send email reminder
+def send_daily_email_reminder():
+    with app.app_context():  # Ensure the app context is available
+        # Fetch drugs only for the current organization
+        drugs = Drug.query.filter(Drug.remaining != 0).all()
+
+        # Fetch the admin's email from the database
+        admin = User.query.filter_by(is_admin=True).first()
+        if not admin:
+            print("No admin found.")
+            return
+
+        admin_email = admin.email  # Get the admin's email from the database
+
+        # Check if admin_email is None or empty
+        if not admin_email:
+            print("Admin email is not set.")
+            return
+
+        # Prepare the email content
+        low_stock_drugs = [drug for drug in drugs if drug.remaining <= drug.reorder_limit]
+        if not low_stock_drugs:
+            print("No low stock items found.")
+            return
+
+        subject = "Daily Low Stock Reminder"
+        body = "The following items are below the reorder limit:\n\n"
+        for drug in low_stock_drugs:
+            body += f"- {drug.name}: Remaining stock: {drug.remaining}\n"
+
+        to_recipients = [admin_email]  # Use the admin's email from the database
+        sender_email = "lshab52@lshtm.ac.uk"  # Hardcode the sender's email or fetch it from a config file
+        cc_recipients = None  # Optional: Add CC recipients if needed
+        attachment = None  # Optional: Add attachment if needed
+
+        # Send the email
+        send_outlook_email(subject, body, to_recipients, sender_email, cc_recipients, attachment)
+        print("Daily email reminder sent.")
+
+# Schedule the email reminder to run once per day at a specific time (e.g., 8:00 AM)
+scheduler.add_job(
+    func=send_daily_email_reminder,
+    trigger='cron',
+    hour=8,  # 8 AM
+    minute=0,
+    timezone='UTC'  # Adjust the timezone as needed
+)
+
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -280,6 +416,7 @@ def manage_users():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        email = request.form['email']  # Get the email from the form
         is_admin = request.form.get('is_admin') == 'on'
 
         existing_user = User.query.filter_by(username=username).first()
@@ -290,14 +427,14 @@ def manage_users():
             new_user = User(
                 username=username,
                 password=hashed_password,
+                email=email,  # Save the email
                 is_admin=is_admin,
-                organization_id=current_user.organization_id  # Assign the same organization as the current user
+                organization_id=current_user.organization_id
             )
             db.session.add(new_user)
             db.session.commit()
             flash('User added successfully!', 'success')
 
-    # Fetch users only for the current organization
     users = User.query.filter_by(organization_id=current_user.organization_id).all()
     return render_template('manage_users.html', users=users)
 
