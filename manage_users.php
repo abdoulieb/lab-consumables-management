@@ -57,8 +57,28 @@ include 'header.php';
         <div class="card-header">Add New User</div>
         <div class="card-body">
             <form action="manage_users.php" method="POST">
+<<<<<<< HEAD
                 <!-- Form fields same as in original HTML -->
                 <!-- ... -->
+=======
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" name="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" name="password" required>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" name="is_admin" id="is_admin">
+                    <label class="form-check-label" for="is_admin">Is Admin</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Add User</button>
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
             </form>
         </div>
     </div>
@@ -69,12 +89,37 @@ include 'header.php';
         <div class="card-body">
             <?php if (count($users) > 0): ?>
                 <table class="table table-bordered table-striped">
+<<<<<<< HEAD
                     <!-- Table headers same as in original HTML -->
                     <tbody>
                         <?php foreach ($users as $user): ?>
                             <tr>
                                 <!-- Table rows same as in original HTML -->
                                 <!-- ... -->
+=======
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Is Admin</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($users as $user): ?>
+                            <tr>
+                                <td><?php echo $user['id']; ?></td>
+                                <td><?php echo htmlspecialchars($user['username']); ?></td>
+                                <td><?php echo $user['is_admin'] ? 'Yes' : 'No'; ?></td>
+                                <td>
+                                    <?php if ($user['id'] != $_SESSION['user_id']): ?>
+                                        <form action="delete_user.php" method="POST" style="display:inline;">
+                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

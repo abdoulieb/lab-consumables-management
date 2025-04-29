@@ -33,7 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['drug_id'])) {
 
         // Check if it's the first time the drug is being used
         $first_used_date = $drug['used'] == 0 && $used > 0 ? date('Y-m-d') : $drug['first_used_date'];
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
         // Check if the drug has finished
         $date_finished = $new_remaining == 0 ? date('Y-m-d') : $drug['date_finished'];
 
@@ -41,7 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['drug_id'])) {
         $update_sql = "UPDATE drug SET used = ?, remaining = ?, first_used_date = ?, date_finished = ? WHERE id = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param("iissi", $new_used, $new_remaining, $first_used_date, $date_finished, $drug_id);
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
         if (!$update_stmt->execute()) {
             throw new Exception("Failed to update drug.");
         }
@@ -50,7 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['drug_id'])) {
         $log_sql = "INSERT INTO drug_update (drug_id, user_id, updated_amount) VALUES (?, ?, ?)";
         $log_stmt = $conn->prepare($log_sql);
         $log_stmt->bind_param("iii", $drug_id, $_SESSION['user_id'], $used);
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
         if (!$log_stmt->execute()) {
             throw new Exception("Failed to log update.");
         }
@@ -62,4 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['drug_id'])) {
 }
 
 redirect('index.php');
+<<<<<<< HEAD
 ?>
+=======
+>>>>>>> f71fa435217b073ae6e412306806f430fca0e6f7
